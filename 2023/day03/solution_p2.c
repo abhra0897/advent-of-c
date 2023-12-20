@@ -1,45 +1,39 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 
+// #define DEBUG
 
 #define ROWS    140
 #define COLS    142 /* 140 chars, 1 '\n', 1 '\0' */
 
 char buf[ROWS * COLS] = {0};
 
-char get_from_buf(int idx_col, int idx_row)
+void debug_print(const char *fmt, ...)
 {
-    if (idx_col < 0 || idx_row < 0 || idx_col >= COLS || idx_row >= ROWS )
-        return '\0';
-    return buf[idx_row * COLS + idx_col];
-}
-
-int is_symbol(char c)
-{
-    if ((c < '0' || c > '9') && c != '.' && c != '\0' && c != '\n')
-        return 1;
-    else
-        return 0;
+#ifdef DEBUG
+    va_list ap;
+    va_start(ap, fmt);
+    vprintf(fmt, ap);
+    va_end(ap);
+#endif
 }
 
 int scan_adjacent(int *adjacent, int idx_col, int idx_row)
 {
     int adj_cnt = 0;
     int i = 0;
-    char tmp_buf[100];
+    char tmp_buf[10];
     int j = 0;
+
+    int start = 0, end = 0;
 
     int tmp_idx_col = 0;
     i = idx_row * COLS;
 
     while(buf[i])
     {
-//         if (i > idx_col && (buf[i] < '0' || buf[i] > '9'))
-//         {
-//             // If we cross the valid adjacent position and there's no number found, no need to scan further
-//             //break;
-//         }
         if (buf[i] >= '0' && buf[i] <= '9')
         {
             tmp_buf[j++] = buf[i];
@@ -50,34 +44,29 @@ int scan_adjacent(int *adjacent, int idx_col, int idx_row)
             j = 0;
             if (strlen(tmp_buf) > 0)
             {
-                fflush(stdout);
-                int start = tmp_idx_col - strlen(tmp_buf);
-                int end = tmp_idx_col - 1;
-//                 printf("    start: %2d, end: %2d, idx_col: %2d, tmpbuf = %s, \n", start, end, idx_col, tmp_buf);
+                start = tmp_idx_col - strlen(tmp_buf);
+                end = tmp_idx_col - 1;
+                debug_print("    start: %2d, end: %2d, idx_col: %2d, tmp_idx_col: %2d, tmp_buf = %s, \n", start, end, idx_col, tmp_idx_col, tmp_buf);
                 if (end == idx_col - 1)
                 {
                     adjacent[adj_cnt] = atoi(tmp_buf);
                     ++adj_cnt;
-                    // Found left-corner adj, start looking for right-corner adj
+                    // Found left-corner adj, break if there's nothing starting at right-corner
+                    if (buf[i+1] < '0' || buf[i+1] > '9')
+                        break;
                 }
-                else if (start == idx_col + 1)
+                else if ((start <= idx_col + 1) && end >= idx_col)
                 {
                     adjacent[adj_cnt] = atoi(tmp_buf);
                     ++adj_cnt;
-                    break; // Found right-corner adj number, there can't be any more adjacents in that row
-                }
-                else if (start <= idx_col && end >= idx_col)
-                {
-                    adjacent[adj_cnt] = atoi(tmp_buf);
-                    ++adj_cnt;
-                    break; // Found center adj number, there can't be other adjacents in that row
+                    break; // Found  right-corner or center adj number, there can't be any more adjacents in that row
                 }
             }
         }
         ++i;
         ++tmp_idx_col;
     }
-//     printf("    [Cnt: %d]\n", adj_cnt);
+    debug_print("    [Cnt: %d]\n", adj_cnt);
     return adj_cnt;
 }
 
@@ -91,17 +80,17 @@ int find_gear_ratio(int idx_col, int idx_row)
 
     if (idx_row) // scan top row if there is any top row at all
     {
-//         printf("  TOP\n");
+        debug_print("  TOP\n");
         adj_cnt = scan_adjacent(&adjacent[adj_cnt], idx_col, (idx_row - 1));
     }
 
     if (idx_row < ROWS - 1) // scan bottom row if there is any bottom row at all
     {
-//         printf("  BOTTOM\n");
+        debug_print("  BOTTOM\n");
         adj_cnt += scan_adjacent(&adjacent[adj_cnt], idx_col, (idx_row + 1));
     }
 
-//     printf("  SAME\n");
+    debug_print("  SAME\n");
     adj_cnt += scan_adjacent(&adjacent[adj_cnt], idx_col, idx_row); // scan the same row
 
     // Proceed only if EXACTLY TWO adjacent numbers
@@ -111,13 +100,15 @@ int find_gear_ratio(int idx_col, int idx_row)
         for (int i = 0; i < adj_cnt; i++)
         {
             gear_ratio *= adjacent[i];
-            printf("  %d  ", adjacent[i]);
+            debug_print("  %d  ", adjacent[i]);
         }
     }
     else
         gear_ratio = 0;
 
-    printf("-> GR: %d \n", gear_ratio);
+    if (gear_ratio)
+        debug_print("-> GR: %d \n", gear_ratio);
+
     return gear_ratio;
 
 }
@@ -148,7 +139,7 @@ int main(void)
 
         if (*tmp_buf == '*')
         {
-            printf("Calling find_gear_ratio(%d, %d)\n", idx_col, idx_row);
+            debug_print("Calling find_gear_ratio(%d, %d)\n", idx_col, idx_row);
             int gr = find_gear_ratio(idx_col, idx_row);
             if (gr)
                 gear_ratio_sum += (long)gr;
